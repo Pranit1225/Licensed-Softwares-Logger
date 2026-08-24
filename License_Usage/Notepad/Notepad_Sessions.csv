@@ -1,0 +1,5 @@
+﻿Start_EventRecordID,End_EventRecordID,User,Computer,Application,Executable_Path,Process_ID,Start_Time_IST,End_Time_IST,Duration_Seconds,Duration,Logon_ID,Parent_Process
+2194463,2194470,Pranit,DESKTOP-EQRIU2C,Notepad,C:\Windows\System32\notepad.exe,0x299c,2026-08-24 14:22:48.839,2026-08-24 14:22:51.170,2.331,00:00:02.331,0x41f6e,C:\Windows\explorer.exe
+2194488,2194494,Pranit,DESKTOP-EQRIU2C,Notepad,C:\Windows\System32\notepad.exe,0x1c90,2026-08-24 14:23:00.445,2026-08-24 14:23:02.000,1.556,00:00:01.556,0x41f6e,C:\Windows\explorer.exe
+2201852,2201857,Pranit,DESKTOP-EQRIU2C,Notepad,C:\Windows\System32\notepad.exe,0x4790,2026-08-24 15:29:53.075,2026-08-24 15:29:55.470,2.395,00:00:02.395,0x41f6e,C:\Windows\explorer.exe
+2202502,2202510,Pranit,DESKTOP-EQRIU2C,Notepad,C:\Windows\System32\notepad.exe,0x6dc,2026-08-24 15:35:52.155,2026-08-24 15:35:56.588,4.433,00:00:04.433,0x41f6e,C:\Windows\explorer.exe
