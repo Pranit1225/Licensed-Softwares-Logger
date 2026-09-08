@@ -1,15 +1,17 @@
-import csv, json, os, time, xml.etree.ElementTree as ET
+import csv, json, os, shutil, time, xml.etree.ElementTree as ET
 from collections import defaultdict
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-
 import win32evtlog
 
 BASE = Path(__file__).resolve().parent
 CONFIG = BASE / "tracked_apps.json"
+LOGGER_CONFIG = BASE / "logger_config.json"
 STATE = BASE / "usage_logger_state.json"
+STATE_BACKUP = BASE / "usage_logger_state.backup.json"
 OUT = BASE / "License_Usage"
 POLL = 1.0
+SAVE_EVERY_BATCH = True
 
 SESSION_FIELDS = [
     "Start_EventRecordID","End_EventRecordID","User","Computer","Application",
@@ -32,6 +34,35 @@ def load_apps():
         raise RuntimeError(f"Missing {CONFIG}. Create it before running.")
     data = json.loads(CONFIG.read_text(encoding="utf-8"))
     return {str(k).lower(): str(v) for k,v in data.items()}
+
+def load_logger_config():
+    global OUT, POLL
+    if not LOGGER_CONFIG.exists():
+        LOGGER_CONFIG.write_text(
+            json.dumps({
+                "output_folder": str(BASE / "License_Usage"),
+                "poll_interval": 1.0
+            }, indent=4),
+            encoding="utf-8"
+        )
+        return
+
+    try:
+        data = json.loads(LOGGER_CONFIG.read_text(encoding="utf-8"))
+        if not isinstance(data, dict):
+            raise ValueError("logger_config.json must contain a JSON object.")
+
+        output_folder = data.get("output_folder")
+        if output_folder:
+            OUT = Path(os.path.expandvars(os.path.expanduser(str(output_folder))))
+            if not OUT.is_absolute():
+                OUT = BASE / OUT
+
+        poll_interval = data.get("poll_interval")
+        if poll_interval is not None:
+            POLL = max(0.1, float(poll_interval))
+    except Exception as ex:
+        raise RuntimeError(f"Invalid {LOGGER_CONFIG}: {ex}") from ex
 
 def lname(tag): return tag.rsplit("}",1)[-1]
 
@@ -60,14 +91,47 @@ def dur(sec):
     h,r=divmod(whole,3600); m,s=divmod(r,60)
     return f"{h:02d}:{m:02d}:{s:02d}.{ms:03d}"
 
+def empty_state():
+    return {"pending":{},"completed":[],"last_event_record_id":0}
+
+def valid_state(st):
+    return (
+        isinstance(st, dict)
+        and isinstance(st.get("pending", {}), dict)
+        and isinstance(st.get("completed", []), list)
+        and isinstance(st.get("last_event_record_id", 0), int)
+    )
+
+def normalize_state(st):
+    if not isinstance(st, dict):
+        return empty_state()
+    st.setdefault("pending", {})
+    st.setdefault("completed", [])
+    st.setdefault("last_event_record_id", 0)
+    return st if valid_state(st) else empty_state()
+
 def load_state():
-    if not STATE.exists(): return {"pending":{},"completed":[]}
-    try: return json.loads(STATE.read_text(encoding="utf-8"))
-    except: return {"pending":{},"completed":[]}
+    candidates = [STATE, STATE_BACKUP]
+    for path in candidates:
+        if not path.exists():
+            continue
+        try:
+            st = json.loads(path.read_text(encoding="utf-8"))
+            if valid_state(normalize_state(st)):
+                return normalize_state(st)
+        except Exception:
+            pass
+    return empty_state()
 
 def save_state(st):
-    tmp=STATE.with_suffix(".tmp")
-    tmp.write_text(json.dumps(st,indent=2),encoding="utf-8")
+    st = normalize_state(st)
+    tmp = STATE.with_suffix(".tmp")
+    tmp.write_text(json.dumps(st, indent=2), encoding="utf-8")
+    if STATE.exists():
+        try:
+            shutil.copy2(STATE, STATE_BACKUP)
+        except OSError:
+            pass
     tmp.replace(STATE)
 
 def safe(s): return "".join("_" if c in '<>:"/\\|?*' else c for c in s)
@@ -86,11 +150,24 @@ def ensure_session(app):
         with p.open("w",newline="",encoding="utf-8-sig") as f:
             csv.DictWriter(f,fieldnames=SESSION_FIELDS).writeheader()
 
+def session_exists(app, end_rid):
+    p = session_file(app)
+    if not p.exists():
+        return False
+    try:
+        with p.open("r", newline="", encoding="utf-8-sig") as f:
+            return any(r.get("End_EventRecordID") == str(end_rid) for r in csv.DictReader(f))
+    except (OSError, csv.Error):
+        return False
+
 def append_session(app,row):
     ensure_session(app)
+    if session_exists(app, row["End_EventRecordID"]):
+        return False
     with session_file(app).open("a",newline="",encoding="utf-8-sig") as f:
         csv.DictWriter(f,fieldnames=SESSION_FIELDS).writerow(row)
         f.flush(); os.fsync(f.fileno())
+    return True
 
 def rebuild_summary(app):
     # Rebuild the summary using calendar months.
@@ -190,10 +267,14 @@ def handle(e,st,apps):
             "End_Time_IST":ist(e["time"]),"Duration_Seconds":f"{seconds:.3f}",
             "Duration":dur(seconds),"Logon_ID":start["logon"],
             "Parent_Process":start["parent"]}
-        append_session(app,row); rebuild_summary(app)
-        st["completed"].append(e["rid"]); st["completed"]=st["completed"][-5000:]
+        written = append_session(app,row)
+        if written:
+            rebuild_summary(app)
+        st["completed"].append(e["rid"])
+        st["completed"] = st["completed"][-5000:]
         del st["pending"][key]
-        print(f"[SESSION] {app} | {row['User']} | {row['Start_Time_IST']} -> {row['End_Time_IST']} IST | {row['Duration']}")
+        if written:
+            print(f"[SESSION] {app} | {row['User']} | {row['Start_Time_IST']} -> {row['End_Time_IST']} IST | {row['Duration']}")
 
 def latest():
     h=win32evtlog.EvtQuery("Security",win32evtlog.EvtQueryChannelPath|win32evtlog.EvtQueryReverseDirection,
@@ -204,27 +285,51 @@ def latest():
     return e["rid"] if e else 0
 
 def main():
-    apps=load_apps(); st=load_state(); OUT.mkdir(exist_ok=True)
+    load_logger_config()
+    apps=load_apps(); st=load_state(); OUT.mkdir(parents=True, exist_ok=True)
     for app in dict.fromkeys(apps.values()): ensure_session(app)
-    try: last=latest()
-    except Exception as ex: raise RuntimeError("Run this program from an Administrator terminal.") from ex
+
+    try:
+        latest_rid = latest()
+    except Exception as ex:
+        raise RuntimeError("Run this program from an Administrator terminal.") from ex
+
+    last = st.get("last_event_record_id", 0)
+    if last <= 0:
+        last = latest_rid
+        st["last_event_record_id"] = last
+        save_state(st)
+
     print("LIVE LOGGER V2 | Tracking:",", ".join(dict.fromkeys(apps.values())))
-    print("Starting after EventRecordID:",last)
+    print("Resuming after EventRecordID:",last)
     print("Output:",OUT); print("Summary period: calendar month"); print("Ctrl+C to stop.")
+
     while True:
         try:
             q=f"*[System[(EventRecordID > {last}) and (EventID=4688 or EventID=4689)]]"
             h=win32evtlog.EvtQuery("Security",win32evtlog.EvtQueryChannelPath,q)
+            batch_processed = False
             while True:
                 hs=win32evtlog.EvtNext(h,64)
                 if not hs: break
                 for x in hs:
                     e=parse(win32evtlog.EvtRender(x,win32evtlog.EvtRenderEventXml))
-                    if e: last=max(last,e["rid"]); handle(e,st,apps)
-            save_state(st); time.sleep(POLL)
+                    if e:
+                        handle(e,st,apps)
+                        last=max(last,e["rid"])
+                        st["last_event_record_id"] = last
+                        batch_processed = True
+                if SAVE_EVERY_BATCH and batch_processed:
+                    save_state(st)
+                    batch_processed = False
+
+            save_state(st)
+            time.sleep(POLL)
+
         except KeyboardInterrupt:
             save_state(st); print("Stopped."); return
         except Exception as ex:
+            save_state(st)
             print("[WARNING]",ex); time.sleep(2)
 
 if __name__=="__main__": main()
