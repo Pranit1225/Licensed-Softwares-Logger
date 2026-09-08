@@ -1,4 +1,4 @@
-import csv, json, os, shutil, time, xml.etree.ElementTree as ET
+import csv, json, logging, logging.handlers, os, shutil, time, xml.etree.ElementTree as ET
 from collections import defaultdict
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -10,8 +10,11 @@ LOGGER_CONFIG = BASE / "logger_config.json"
 STATE = BASE / "usage_logger_state.json"
 STATE_BACKUP = BASE / "usage_logger_state.backup.json"
 OUT = BASE / "License_Usage"
+LOG_DIR = BASE / "Logger_Logs"
+LOG_FILE = LOG_DIR / "logger.log"
 POLL = 1.0
 SAVE_EVERY_BATCH = True
+logger = logging.getLogger("LicenseLogger")
 
 SESSION_FIELDS = [
     "Start_EventRecordID","End_EventRecordID","User","Computer","Application",
@@ -34,6 +37,21 @@ def load_apps():
         raise RuntimeError(f"Missing {CONFIG}. Create it before running.")
     data = json.loads(CONFIG.read_text(encoding="utf-8"))
     return {str(k).lower(): str(v) for k,v in data.items()}
+
+def setup_logging():
+    global LOG_DIR, LOG_FILE
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    handler = logging.handlers.RotatingFileHandler(
+        LOG_FILE, maxBytes=5 * 1024 * 1024, backupCount=5, encoding="utf-8"
+    )
+    formatter = logging.Formatter("%(asctime)s | %(levelname)s | %(message)s")
+    handler.setFormatter(formatter)
+    logger.setLevel(logging.INFO)
+    logger.handlers.clear()
+    logger.addHandler(handler)
+
+def log_exception(message):
+    logger.exception(message)
 
 def load_logger_config():
     global OUT, POLL
@@ -253,12 +271,12 @@ def handle(e,st,apps):
         st["pending"][key]={"rid":e["rid"],"user":user,"computer":e["computer"],
             "app":app,"exe":exe,"pid":pid,"time":e["time"],"logon":logon,
             "parent":d.get("ParentProcessName","")}
-        print(f"[START] {app} | {user} | PID {pid} | {ist(e['time'])} IST")
+        logger.info("START | %s | %s | PID %s | %s IST", app, user, pid, ist(e["time"]))
     else:
         if e["rid"] in st["completed"]: return
         start=st["pending"].get(key)
         if not start:
-            print(f"[END WITHOUT MATCH] {app} | {user} | PID {pid}"); return
+            logger.warning("END WITHOUT MATCH | %s | %s | PID %s", app, user, pid); return
         seconds=(utc(e["time"])-utc(start["time"])).total_seconds()
         row={"Start_EventRecordID":start["rid"],"End_EventRecordID":e["rid"],
             "User":start["user"],"Computer":start["computer"] or e["computer"],
@@ -274,7 +292,7 @@ def handle(e,st,apps):
         st["completed"] = st["completed"][-5000:]
         del st["pending"][key]
         if written:
-            print(f"[SESSION] {app} | {row['User']} | {row['Start_Time_IST']} -> {row['End_Time_IST']} IST | {row['Duration']}")
+            logger.info("SESSION | %s | %s | %s -> %s IST | %s", app, row["User"], row["Start_Time_IST"], row["End_Time_IST"], row["Duration"])
 
 def latest():
     h=win32evtlog.EvtQuery("Security",win32evtlog.EvtQueryChannelPath|win32evtlog.EvtQueryReverseDirection,
@@ -286,6 +304,7 @@ def latest():
 
 def main():
     load_logger_config()
+    setup_logging()
     apps=load_apps(); st=load_state(); OUT.mkdir(parents=True, exist_ok=True)
     for app in dict.fromkeys(apps.values()): ensure_session(app)
 
@@ -300,9 +319,9 @@ def main():
         st["last_event_record_id"] = last
         save_state(st)
 
-    print("LIVE LOGGER V2 | Tracking:",", ".join(dict.fromkeys(apps.values())))
-    print("Resuming after EventRecordID:",last)
-    print("Output:",OUT); print("Summary period: calendar month"); print("Ctrl+C to stop.")
+    logger.info("Logger started | Tracking: %s", ", ".join(dict.fromkeys(apps.values())))
+    logger.info("Resuming after EventRecordID: %s", last)
+    logger.info("Output: %s | Summary period: calendar month", OUT)
 
     while True:
         try:
@@ -327,9 +346,12 @@ def main():
             time.sleep(POLL)
 
         except KeyboardInterrupt:
-            save_state(st); print("Stopped."); return
+            save_state(st)
+            logger.info("Logger stopped by user")
+            return
         except Exception as ex:
             save_state(st)
-            print("[WARNING]",ex); time.sleep(2)
+            logger.error("Runtime error: %s", ex, exc_info=True)
+            time.sleep(2)
 
 if __name__=="__main__": main()
