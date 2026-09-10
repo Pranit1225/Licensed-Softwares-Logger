@@ -1,2 +1,6 @@
-python-evtx>=0.7.4
-pywin32>=306
+# Development / Build dependencies
+pywin32
+pyinstaller
+
+# Optional: resource-impact testing utility
+psutil
