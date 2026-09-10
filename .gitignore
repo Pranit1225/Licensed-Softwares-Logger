@@ -6,3 +6,7 @@ LicenseLoggerBuild/
 test.evtx
 usage_logger_state.json
 usage_logger_state.backup.json
+resource_usage_test.csv
+__pycache__/
+build/
+dist/
