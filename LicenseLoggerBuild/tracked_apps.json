@@ -1,0 +1,7 @@
+{
+  "notepad.exe": "Notepad",
+  "acad.exe": "AutoCAD",
+  "parametric.exe": "Creo",
+  "VERIFY_CADSTAR_EXECUTABLE.exe": "CADSTAR",
+  "VERIFY_DASSAULT_EXECUTABLE.exe": "Dassault"
+}

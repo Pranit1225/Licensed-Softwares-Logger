@@ -4,3 +4,20 @@
 2026-09-08 15:58:48,509 | INFO | START | Notepad | Pranit | PID 0x4068 | 2026-09-08 15:58:46.104 IST
 2026-09-08 15:58:50,214 | INFO | SESSION | Notepad | Pranit | 2026-09-08 15:58:46.104 -> 2026-09-08 15:58:48.535 IST | 00:00:02.431
 2026-09-08 15:59:06,249 | INFO | Logger stopped by user
+2026-09-10 10:35:39,411 | INFO | Logger started | Tracking: Notepad, AutoCAD, Creo, CADSTAR, Dassault
+2026-09-10 10:35:39,423 | INFO | Resuming after EventRecordID: 2611381
+2026-09-10 10:35:39,474 | INFO | Output: D:\Coding Programs\VSCODE Programs\GitHub\Process_Logger\License_Usage | Summary period: calendar month
+2026-09-10 10:38:05,791 | INFO | Logger stopped by user
+2026-09-10 10:38:21,998 | INFO | Logger started | Tracking: Notepad, AutoCAD, Creo, CADSTAR, Dassault
+2026-09-10 10:38:21,999 | INFO | Resuming after EventRecordID: 2636009
+2026-09-10 10:38:22,000 | INFO | Output: D:\Coding Programs\VSCODE Programs\GitHub\Process_Logger\License_Usage | Summary period: calendar month
+2026-09-10 10:39:46,095 | INFO | Logger stopped by user
+2026-09-10 10:40:00,637 | INFO | Logger started | Tracking: Notepad, AutoCAD, Creo, CADSTAR, Dassault
+2026-09-10 10:40:00,638 | INFO | Resuming after EventRecordID: 2636421
+2026-09-10 10:40:00,662 | INFO | Output: D:\Coding Programs\VSCODE Programs\GitHub\Process_Logger\License_Usage | Summary period: calendar month
+2026-09-10 10:58:09,768 | INFO | Logger started | Tracking: Notepad, AutoCAD, Creo, CADSTAR, Dassault
+2026-09-10 10:58:09,769 | INFO | Resuming after EventRecordID: 2636936
+2026-09-10 10:58:09,770 | INFO | Output: D:\Coding Programs\VSCODE Programs\GitHub\Process_Logger\License_Usage | Summary period: calendar month
+2026-09-10 10:58:52,939 | INFO | START | Notepad | Pranit | PID 0x1b30 | 2026-09-10 10:58:50.858 IST
+2026-09-10 10:58:56,511 | INFO | SESSION | Notepad | Pranit | 2026-09-10 10:58:50.858 -> 2026-09-10 10:58:54.127 IST | 00:00:03.269
+2026-09-10 10:59:25,308 | INFO | Logger stopped by user
