@@ -1,2 +1,8 @@
 old/
 usage_logger_state.json
+License_Usage/
+Logger_Logs/
+LicenseLoggerBuild/
+test.evtx
+usage_logger_state.json
+usage_logger_state.backup.json
