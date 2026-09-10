@@ -1,0 +1,6 @@
+2026-09-08 15:58:23,321 | INFO | Logger started | Tracking: Notepad, AutoCAD, Creo, CADSTAR, Dassault
+2026-09-08 15:58:23,323 | INFO | Resuming after EventRecordID: 2609074
+2026-09-08 15:58:23,324 | INFO | Output: D:\Coding Programs\VSCODE Programs\GitHub\Process_Logger\License_Usage | Summary period: calendar month
+2026-09-08 15:58:48,509 | INFO | START | Notepad | Pranit | PID 0x4068 | 2026-09-08 15:58:46.104 IST
+2026-09-08 15:58:50,214 | INFO | SESSION | Notepad | Pranit | 2026-09-08 15:58:46.104 -> 2026-09-08 15:58:48.535 IST | 00:00:02.431
+2026-09-08 15:59:06,249 | INFO | Logger stopped by user
